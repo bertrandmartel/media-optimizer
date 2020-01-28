@@ -1,0 +1,80 @@
+on: [push, pull_request]
+name: build and deploy
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13.x
+    - name: Checkout code
+      uses: actions/checkout@v1
+    - name: Install golangci-lint
+      run: |
+        go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    - name: Run linters
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin   
+        ./pre-commit
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+   
+    - name: Docker Login
+      uses: azure/docker-login@v1
+      with:
+        login-server: docker.pkg.github.com
+        username: $GITHUB_ACTOR
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - run:   echo ::set-env name=REPOSITORY_NAME::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}')
+      shell: bash
+
+    - name: Docker Build & Push
+      run: |
+        export DOCKER_TAG=docker.pkg.github.com/$GITHUB_REPOSITORY/$REPOSITORY_NAME:${GITHUB_REF#refs/heads/}
+        docker build . -t $DOCKER_TAG 
+        docker push $DOCKER_TAG
+#  test:
+#    strategy:
+#      matrix:
+#        go-version: [1.12.x, 1.13.x]
+#        platform: [ubuntu-latest, macos-latest, windows-latest]
+#    runs-on: ${{ matrix.platform }}
+#    steps:
+#    - name: Install Go
+#      if: success()
+#      uses: actions/setup-go@v1
+#      with:
+#        go-version: ${{ matrix.go-version }}
+#    - name: Checkout code
+#      uses: actions/checkout@v1
+#    - name: Run tests
+#      run: go test ./sp/... -v -covermode=count 
+#
+#  coverage:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - name: Install Go
+#      if: success()
+#      uses: actions/setup-go@v1
+#      with:
+#        go-version: 1.13.x
+#    - name: Checkout code
+#      uses: actions/checkout@v1
+#    - name: Calc coverage 
+#      run: |
+#        export PATH=$PATH:$(go env GOPATH)/bin   
+#        go test ./sp/... -v -covermode=count -coverprofile=coverage.out
+#    - name: Convert coverage to lcov
+#      uses: jandelgado/gcov2lcov-action@v1.0.0
+#      with:
+#          infile: coverage.out
+#          outfile: coverage.lcov
+#    - name: Coveralls
+#      uses: coverallsapp/github-action@v1.0.1
+#      with:
+#          github-token: ${{ secrets.github_token }}
+#          path-to-lcov: coverage.lcov

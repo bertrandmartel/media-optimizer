@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Media optimizer stack
+Parameters: 
+  QueueName: 
+    Default: "ProcessMediaQueue"
+    Description: "Name of the SQS queue to process the media"
+    Type: "String"
+  BucketName:
+    Type: String
+    Default: website-media-1234567
+    Description: name of Bucket holding media content
+  Subnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: subnet for media optimizer EC2 instance
+  DockerImage:
+    Type: String
+    Default: bertrandmartel/media-optimizer:latest
+    Description: media-optmizer docker image
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - m4.large
+    - m4.xlarge
+    - m4.2xlarge
+    - m4.4xlarge
+    - m4.10xlarge
+    - c4.large
+    - c4.xlarge
+    - c4.2xlarge
+    - c4.4xlarge
+    - c4.8xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    - r3.large
+    - r3.xlarge
+    - r3.2xlarge
+    - r3.4xlarge
+    - r3.8xlarge
+    - i2.xlarge
+    - i2.2xlarge
+    - i2.4xlarge
+    - i2.8xlarge
+  LogRetention:
+    Type: Number
+    Default: 14
+    Description: Log retention
+Mappings:
+  AWSRegionAMI:
+    eu-west-3:
+      ID: ami-007fae589fdf6e955
+    eu-north-1:
+      ID: ami-0662eb9b9b8685935
+    eu-west-2:
+      ID: ami-0089b31e09ac3fffc
+    eu-west-1:
+      ID: ami-0713f98de93617bb4
+    eu-central-1:
+      ID: ami-07cda0db070313c52
+    sa-east-1:
+      ID: ami-09de7b4017733e2af
+    ca-central-1:
+      ID: ami-0a269ca7cc3e3beff
+    us-east-1:
+      ID: ami-062f7200baf2fa504
+    us-east-2:
+      ID: ami-02ccb28830b645a41
+    us-west-1:
+      ID: ami-03caa3f860895f82e
+    us-west-2:
+      ID: ami-04590e7389a6e577c
+    ap-northeast-1:
+      ID: ami-011facbea5ec0363b
+    ap-southeast-2:
+      ID: ami-0b8b10b5bf11f3a22
+    ap-southeast-1:
+      ID: ami-05c64f7b4062b0a21
+    ap-northeast-2:
+      ID: ami-0bea7fd38fabe821a
+    ap-south-1:
+      ID: ami-0217a85e28e625474
+Resources:
+  EC2PolicySQS:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EC2PolicySQS
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 
+            - "sqs:DeleteMessage"
+            - "sqs:ReceiveMessage"
+            - "sqs:GetQueueUrl"
+            Resource: 
+            - !GetAtt SQSQueue.Arn
+      Roles: 
+      - !Ref InstanceRole
+  EC2PolicyS3:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EC2PolicyS3
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 
+            - "s3:ListBucket"
+            Resource: 
+            - !Sub "arn:aws:s3:::${BucketName}"
+          - Effect: Allow
+            Action: 
+            - "s3:PutObject"
+            - "s3:GetObject"
+            - "s3:DeleteObject"
+            - "s3:GetObjectTagging"
+            - "s3:PutObjectTagging"
+            Resource: 
+            - !Sub "arn:aws:s3:::${BucketName}/*"
+      Roles: 
+      - !Ref InstanceRole
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}"
+  MediaBucket:
+    DependsOn:
+    - LambdaInvokePermission
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Ref BucketName
+      NotificationConfiguration:
+        LambdaConfigurations:
+        - Event: s3:ObjectCreated:*
+          Function: !GetAtt LambdaFunction.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}"
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+      - !Ref InstanceRole
+  MediaOptimizerInstance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionAMI
+        - Ref: AWS::Region
+        - ID
+      IamInstanceProfile: !Ref InstanceProfile
+      InstanceType: !Ref InstanceType
+      Tags:
+      - Key: Name
+        Value: !Sub "${AWS::StackName}"
+      SubnetId: !Ref Subnet
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          amazon-linux-extras install docker -y
+          service docker start
+          chkconfig docker on
+          docker pull ${DockerImage}
+          docker run -d \
+                 -e AWS_REGION=${AWS::Region} \
+                 --log-driver=awslogs \
+                 --log-opt awslogs-region=${AWS::Region} \
+                 --log-opt awslogs-group=${AWS::StackName} \
+                 ${DockerImage}
+  LogGroupMediaOptimizer:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "${AWS::StackName}"
+      RetentionInDays: !Ref LogRetention
+  LambdaInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub 'arn:aws:s3:::${BucketName}'
+  SQSQueue: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: !Ref QueueName
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}"
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+    - SQSQueue
+    Properties:
+      InlineCode: |
+          const fs = require('fs');
+          const aws = require('aws-sdk');
+          const sqs = new aws.SQS({apiVersion: '2012-11-05'});
+
+          const queue = `https://${process.env.AwsRegion}.queue.amazonaws.com/${process.env.AwsAccountId}/${process.env.QueueName}`;
+
+          exports.handler = function(event, context) {
+              console.log(JSON.stringify(event, null, 4));
+              var params = {
+                  MessageBody: JSON.stringify(event),
+                  QueueUrl: queue
+              };
+              sqs.sendMessage(params, function (err, data) {
+                  if (err) { console.log('Error while sending message: ' + err); }
+                  else { console.log('Message sent, ID: ' + data.MessageId); }
+              });
+          };
+      Description: Send a SQS message with the S3 Event
+      Handler: index.handler
+      Timeout: 300
+      Role: !GetAtt LambdaIAMRole.Arn
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          AwsRegion: !Ref AWS::Region
+          AwsAccountId: !Ref AWS::AccountId
+          QueueName: !Ref QueueName
+  LambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: !Sub "Lambda-${AWS::StackName}"
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: LambdaLogging
+            Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - arn:aws:logs:*:*:*
+          - Sid: SQS
+            Action: "sqs:SendMessage"
+            Effect: Allow
+            Resource: !GetAtt SQSQueue.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}"

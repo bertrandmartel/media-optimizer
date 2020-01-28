@@ -1,0 +1,50 @@
+{	
+	"ignoreTag": "optimizer_ignore",
+	"optimizers": [{
+		"contentType": "image/png",
+		"exec": [{
+			"binary": "pngquant",
+			"outputFile": "--output",
+			"params": ["-f"]
+		},{
+			"binary":"optipng",
+			"outputFile": "-out",
+			"params": ["-i0","-o2", "-clobber"]
+		}]
+	},{
+		"contentType": "image/jpeg",
+		"exec": [{
+			"binary": "jpegoptim",
+			"outputDirectory": "-d",
+			"params": ["-m85", "--strip-all", "--all-progressive"]
+		}]
+	},{
+		"contentType": "image/svg+xml",
+		"exec": [{
+			"binary": "svgo",
+			"outputFile": "-o",
+			"params": ["--disable={cleanupIDs,removeViewBox}"]
+		}]
+	},{
+		"contentType": "image/gif",
+		"exec": [{
+			"binary": "gifsicle",
+			"outputFile": "-o",
+			"params": ["-b","-O3"]
+		}]
+	},{
+		"contentType": "image/webp",
+		"exec": [{
+			"binary": "cwebp",
+			"outputFile": "-o",
+			"params": ["-m","6","-pass","10","-mt","-q","80"]
+		}]
+	},{
+		"contentType": "video/mp4",
+		"exec": [{
+			"binary": "ffmpeg",
+			"inputFile": "-i",
+			"params": ["-vcodec","libx264","-crf","24","-y"]
+		}]
+	}]
+}
