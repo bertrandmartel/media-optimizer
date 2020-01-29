@@ -1,5 +1,6 @@
 {	
 	"ignoreTag": "optimizer_ignore",
+	"fileACL": "public-read",
 	"optimizers": [{
 		"contentType": "image/png",
 		"exec": [{

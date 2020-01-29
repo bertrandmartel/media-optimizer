@@ -22,10 +22,14 @@ import (
 const inputMediaDir = "/tmp/input_media"
 const outputMediaDir = "/tmp/output_media"
 const configFile = "optimizer.json"
+const defaultFileCacheControl = "max-age=15552000"
+const defaultFileACL = "private" //https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#CannedACL
 
 type Config struct {
-	IgnoreTag  string      `jons:"ignoreTag"`
-	Optimizers []Optimizer `json:"optimizers"`
+	FileACL          string      `json:"fileACL"`
+	FileCacheControl string      `json:"fileCacheControl"`
+	IgnoreTag        string      `jons:"ignoreTag"`
+	Optimizers       []Optimizer `json:"optimizers"`
 }
 
 type Optimizer struct {
@@ -47,6 +51,13 @@ func main() {
 
 	config := Config{
 		Optimizers: []Optimizer{},
+	}
+
+	if config.FileACL == "" {
+		config.FileACL = getEnv("OBJECT_ACL", defaultFileACL)
+	}
+	if config.FileCacheControl == "" {
+		config.FileCacheControl = getEnv("OBJECT_CACHE_CONTROL", defaultFileCacheControl)
 	}
 	getConfig(&config)
 
@@ -158,7 +169,9 @@ func process(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 				break
 			}
 			fmt.Printf("upload %v to S3\n", outputFilePath)
-			s3utils.UploadToS3(s3Svc, &outputFilePath, &bucketName, &object, &config.IgnoreTag)
+			s3utils.UploadToS3(
+				s3Svc, &outputFilePath, &bucketName,
+				&object, &config.IgnoreTag, headObject.ContentType, &config.FileACL, &config.FileCacheControl)
 		}
 		_, err = sqsSvc.DeleteMessage(&sqs.DeleteMessageInput{
 			QueueUrl:      queueURL,
@@ -239,4 +252,11 @@ func processCommands(inputFilePath *string, outputFilePath *string, optimizer *O
 	}
 	fmt.Println(currentOutputFilePath)
 	*outputFilePath = currentOutputFilePath
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

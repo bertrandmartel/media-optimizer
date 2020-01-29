@@ -36,7 +36,7 @@ In AWS dashboard, go to cloudformation & create a new stack from the template fi
 
 In the parameters, change the bucket name & the subnet value (a private subnet is fine)
 
-![parameters](https://user-images.githubusercontent.com/5183022/73299367-579bea80-420f-11ea-9344-ebea6c0ec1cb.png)
+![parameters](https://user-images.githubusercontent.com/5183022/73375742-8cb24680-42bc-11ea-8dcb-adb1ac80f0e0.png)
 
 When the stack is up, go to the created S3 bucket & upload some images. After some moment, you will notice they will be automatically optimized
 

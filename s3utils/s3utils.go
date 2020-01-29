@@ -12,7 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-func UploadToS3(s3Svc *s3.S3, fileName *string, bucketName *string, object *string, ignoreTag *string) {
+func UploadToS3(
+	s3Svc *s3.S3, fileName *string, bucketName *string, object *string,
+	ignoreTag *string, contentType *string, acl *string, cacheControl *string) {
 	data, err := ioutil.ReadFile(*fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -24,6 +26,9 @@ func UploadToS3(s3Svc *s3.S3, fileName *string, bucketName *string, object *stri
 		Key:                  aws.String(*object),
 		ServerSideEncryption: aws.String("AES256"),
 		StorageClass:         aws.String("STANDARD"),
+		ContentType:          aws.String(*contentType),
+		ACL:                  aws.String(*acl),
+		CacheControl:         aws.String(*cacheControl),
 		Tagging:              aws.String(fmt.Sprintf("%v=true", *ignoreTag)),
 	}
 	_, err = s3Svc.PutObject(input)

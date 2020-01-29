@@ -10,6 +10,14 @@ Parameters:
     Type: String
     Default: website-media-1234567
     Description: name of Bucket holding media content
+  ObjectACL:
+    Type: String
+    Default: public-read
+    Description: permission for bucket object (https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#CannedACL)
+  ObjectCacheControl:
+    Type: String
+    Default: max-age=15552000
+    Description: object cache control
   Subnet:
     Type: AWS::EC2::Subnet::Id
     Description: subnet for media optimizer EC2 instance
@@ -128,6 +136,7 @@ Resources:
             - "s3:DeleteObject"
             - "s3:GetObjectTagging"
             - "s3:PutObjectTagging"
+            - "s3:PutObjectAcl"
             Resource: 
             - !Sub "arn:aws:s3:::${BucketName}/*"
       Roles: 
@@ -191,6 +200,8 @@ Resources:
           docker pull ${DockerImage}
           docker run -d \
                  -e AWS_REGION=${AWS::Region} \
+                 -e OBJECT_ACL=${ObjectACL} \
+                 -e OBJECT_CACHE_CONTROL=${ObjectCacheControl} \
                  --log-driver=awslogs \
                  --log-opt awslogs-region=${AWS::Region} \
                  --log-opt awslogs-group=${AWS::StackName} \
