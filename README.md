@@ -2,6 +2,7 @@
 
 [![Build Status](https://github.com/bertrandmartel/media-optimizer/workflows/build%20and%20deploy/badge.svg)](https://github.com/bertrandmartel/media-optimizer/actions?workflow=build%20and%20deploy)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bertrandmartel/media-optimizer)](https://goreportcard.com/report/github.com/bertrandmartel/media-optimizer)
+[![](https://img.shields.io/docker/pulls/bertrandmartel/media-optimizer.svg)](https://hub.docker.com/r/bertrandmartel/media-optimizer)
 [![License](http://img.shields.io/:license-mit-blue.svg)](LICENSE.md)
 
 Automatically optimize your images & videos hosted on AWS S3 when an S3 event is detected
