@@ -36,7 +36,7 @@ In AWS dashboard, go to cloudformation & create a new stack from the template fi
 
 In the parameters, change the bucket name & the subnet value (a private subnet is fine)
 
-![parameters](https://user-images.githubusercontent.com/5183022/73375742-8cb24680-42bc-11ea-8dcb-adb1ac80f0e0.png)
+![parameters](https://user-images.githubusercontent.com/5183022/73380987-444b5680-42c5-11ea-87e1-dde54ab4ebe3.png)
 
 When the stack is up, go to the created S3 bucket & upload some images. After some moment, you will notice they will be automatically optimized
 
@@ -95,6 +95,19 @@ You can add more format & more commands to the config file `optimizer.json`
 * `outputDirectory` is the parameter for the output directory if `outputFile` is not specified
 * `inputFile` is the parameter for the input file if neither `outputFile` nor `outputDirectory` are specified. In case `inputFile` is specified the outputFile value will be appended to the parameters (at the end)
 
+## Environment variables
+
+Those variables configure S3 Object configuration & metadata :
+
+| name      | default value |
+|-----------|-------------|
+| OBJECT_ACL | private |
+| OBJECT_CACHE_CONTROL | max-age=15552000 |
+| OBJECT_STORAGE_CLASS | STANDARD | 
+| OBJECT_SERVER_SIDE_ENCRYPTION | none |
+
+Note that if `AWS::Region` is not specified in your `~/.aws`, the variable `AWS_REGION` should be set (see [cloudformation.yml](https://github.com/bertrandmartel/media-optimizer/blob/master/cloudformation.yml))
+
 ## Run locally
 
 ```bash
@@ -112,6 +125,7 @@ docker run -v $HOME/.aws:/root/.aws -it media-optimizer
 ## Run with docker (DockerHub)
 
 ```bash
+docker pull bertrandmartel/media-optimizer:latest
 docker run -v $HOME/.aws:/root/.aws -it bertrandmartel/media-optimizer:latest
 ```
 

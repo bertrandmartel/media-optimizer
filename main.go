@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/bertrandmartel/media-optimizer/fileutils"
+	"github.com/bertrandmartel/media-optimizer/model"
 	"github.com/bertrandmartel/media-optimizer/s3utils"
 	"github.com/bertrandmartel/media-optimizer/sqsutils"
 )
@@ -24,40 +25,28 @@ const outputMediaDir = "/tmp/output_media"
 const configFile = "optimizer.json"
 const defaultFileCacheControl = "max-age=15552000"
 const defaultFileACL = "private" //https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#CannedACL
-
-type Config struct {
-	FileACL          string      `json:"fileACL"`
-	FileCacheControl string      `json:"fileCacheControl"`
-	IgnoreTag        string      `jons:"ignoreTag"`
-	Optimizers       []Optimizer `json:"optimizers"`
-}
-
-type Optimizer struct {
-	ContentType string    `json:"contentType"`
-	Exec        []Command `json:"exec"`
-}
-
-type Command struct {
-	Binary          string   `json:"binary"`
-	OutputFile      string   `json:"outputFile"`
-	OutputDirectory string   `json:"outputDirectory"`
-	IntputFile      string   `json:"inputFile"`
-	Params          []string `json:"params"`
-}
+const defaultStorageClass = "STANDARD"
+const defaultServerSideEncryption = "none"
 
 func main() {
 	fileutils.InitDir(inputMediaDir)
 	fileutils.InitDir(outputMediaDir)
 
-	config := Config{
-		Optimizers: []Optimizer{},
+	config := model.Config{
+		Optimizers: []model.Optimizer{},
 	}
 
-	if config.FileACL == "" {
-		config.FileACL = getEnv("OBJECT_ACL", defaultFileACL)
+	if config.S3Config.ACL == "" {
+		config.S3Config.ACL = getEnv("OBJECT_ACL", defaultFileACL)
 	}
-	if config.FileCacheControl == "" {
-		config.FileCacheControl = getEnv("OBJECT_CACHE_CONTROL", defaultFileCacheControl)
+	if config.S3Config.CacheControl == "" {
+		config.S3Config.CacheControl = getEnv("OBJECT_CACHE_CONTROL", defaultFileCacheControl)
+	}
+	if config.S3Config.StorageClass == "" {
+		config.S3Config.StorageClass = getEnv("OBJECT_STORAGE_CLASS", defaultStorageClass)
+	}
+	if config.S3Config.ServerSideEncryption == "" {
+		config.S3Config.ServerSideEncryption = getEnv("OBJECT_SERVER_SIDE_ENCRYPTION", defaultServerSideEncryption)
 	}
 	getConfig(&config)
 
@@ -80,7 +69,7 @@ func main() {
 	select {} // block forever
 }
 
-func getConfig(config *Config) {
+func getConfig(config *model.Config) {
 	content, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		fmt.Println(err)
@@ -91,7 +80,7 @@ func getConfig(config *Config) {
 	}
 }
 
-func forever(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
+func forever(config *model.Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 	for {
 		process(config, sqsSvc, s3Svc, queueURL)
 		fmt.Println("cleaning directories...")
@@ -101,7 +90,7 @@ func forever(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 	}
 }
 
-func process(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
+func process(config *model.Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 	var timeout int64 = 20
 	fmt.Println("Waiting for messages...")
 	msgRes := sqsutils.ReceiveMessages(sqsSvc, queueURL, &timeout)
@@ -171,7 +160,7 @@ func process(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 			fmt.Printf("upload %v to S3\n", outputFilePath)
 			s3utils.UploadToS3(
 				s3Svc, &outputFilePath, &bucketName,
-				&object, &config.IgnoreTag, headObject.ContentType, &config.FileACL, &config.FileCacheControl)
+				&object, &config.IgnoreTag, headObject.ContentType, &config.S3Config)
 		}
 		_, err = sqsSvc.DeleteMessage(&sqs.DeleteMessageInput{
 			QueueUrl:      queueURL,
@@ -185,7 +174,7 @@ func process(config *Config, sqsSvc *sqs.SQS, s3Svc *s3.S3, queueURL *string) {
 	}
 }
 
-func getOptimizer(config *Config, contentType *string) *Optimizer {
+func getOptimizer(config *model.Config, contentType *string) *model.Optimizer {
 	for i := 0; i < len(config.Optimizers); i++ {
 		if config.Optimizers[i].ContentType == *contentType {
 			return &config.Optimizers[i]
@@ -194,7 +183,7 @@ func getOptimizer(config *Config, contentType *string) *Optimizer {
 	return nil
 }
 
-func processCommands(inputFilePath *string, outputFilePath *string, optimizer *Optimizer) {
+func processCommands(inputFilePath *string, outputFilePath *string, optimizer *model.Optimizer) {
 	optim := *optimizer
 	currentInputFilePath := *inputFilePath
 	currentOutputFilePath := ""

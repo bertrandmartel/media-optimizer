@@ -18,6 +18,14 @@ Parameters:
     Type: String
     Default: max-age=15552000
     Description: object cache control
+  ObjectStorageClass:
+    Type: String
+    Default: STANDARD
+    Description: object storage class
+  ObjectServerSideEncryption:
+    Type: String
+    Default: none
+    Description: server side encryption ("none" if not applicable)
   Subnet:
     Type: AWS::EC2::Subnet::Id
     Description: subnet for media optimizer EC2 instance
@@ -202,6 +210,8 @@ Resources:
                  -e AWS_REGION=${AWS::Region} \
                  -e OBJECT_ACL=${ObjectACL} \
                  -e OBJECT_CACHE_CONTROL=${ObjectCacheControl} \
+                 -e OBJECT_STORAGE_CLASS=${ObjectStorageClass} \
+                 -e OBJECT_SERVER_SIDE_ENCRYPTION=${ObjectServerSideEncryption} \
                  --log-driver=awslogs \
                  --log-opt awslogs-region=${AWS::Region} \
                  --log-opt awslogs-group=${AWS::StackName} \

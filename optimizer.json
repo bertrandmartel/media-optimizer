@@ -1,6 +1,9 @@
 {	
+	"s3Config": {
+		"acl": "public-read",
+		"storageClass": "STANDARD"
+	},
 	"ignoreTag": "optimizer_ignore",
-	"fileACL": "public-read",
 	"optimizers": [{
 		"contentType": "image/png",
 		"exec": [{

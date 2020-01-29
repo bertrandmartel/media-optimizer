@@ -10,27 +10,31 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/bertrandmartel/media-optimizer/model"
 )
 
 func UploadToS3(
 	s3Svc *s3.S3, fileName *string, bucketName *string, object *string,
-	ignoreTag *string, contentType *string, acl *string, cacheControl *string) {
+	ignoreTag *string, contentType *string, s3Config *model.S3Config) {
 	data, err := ioutil.ReadFile(*fileName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	input := &s3.PutObjectInput{
-		Body:                 bytes.NewReader(data),
-		Bucket:               aws.String(*bucketName),
-		Key:                  aws.String(*object),
-		ServerSideEncryption: aws.String("AES256"),
-		StorageClass:         aws.String("STANDARD"),
-		ContentType:          aws.String(*contentType),
-		ACL:                  aws.String(*acl),
-		CacheControl:         aws.String(*cacheControl),
-		Tagging:              aws.String(fmt.Sprintf("%v=true", *ignoreTag)),
+		Body:         bytes.NewReader(data),
+		Bucket:       aws.String(*bucketName),
+		Key:          aws.String(*object),
+		StorageClass: aws.String(s3Config.StorageClass),
+		ContentType:  aws.String(*contentType),
+		ACL:          aws.String(s3Config.ACL),
+		CacheControl: aws.String(s3Config.CacheControl),
+		Tagging:      aws.String(fmt.Sprintf("%v=true", *ignoreTag)),
 	}
+	if s3Config.ServerSideEncryption != "none" {
+		input.ServerSideEncryption = aws.String(s3Config.ServerSideEncryption)
+	}
+
 	_, err = s3Svc.PutObject(input)
 	if err != nil {
 		fmt.Println(err.Error())
